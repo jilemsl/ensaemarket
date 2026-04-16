@@ -1,26 +1,44 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* globals.css */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f0f0f0; /* Gris très clair type vieux Windows */
+  font-family: "Courier New", Courier, monospace;
+  color: #222;
+  margin: 0;
+  padding: 20px;
+}
+
+main {
+  background: white;
+  border: 2px solid #000;
+  box-shadow: 5px 5px 0px #888; /* Ombre portée brute */
+  padding: 20px;
+}
+
+h1, h2 {
+  background: #000080; /* Bleu marine Windows 95 */
+  color: white;
+  padding: 5px 10px;
+  text-transform: uppercase;
+  font-size: 1.2rem;
+}
+
+button {
+  background: #d1d1d1;
+  border-left: 2px solid #fff;
+  border-top: 2px solid #fff;
+  border-right: 2px solid #555;
+  border-bottom: 2px solid #555;
+  padding: 5px 15px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button:active {
+  border: 2px solid #333;
+}
+
+input {
+  border: 1px solid #000;
+  padding: 5px;
+  background: #fff;
 }
