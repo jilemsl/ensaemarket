@@ -11,7 +11,7 @@ export default function StatsPage() {
   const [globalAbsences, setGlobalAbsences] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'classement' | 'absences'>('classement');
   const [loading, setLoading] = useState(true);
-
+  
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -29,21 +29,37 @@ export default function StatsPage() {
         .limit(10);
       setTopUsers(users || []);
 
-      // C. Classement Absences (Global)
-      const { data: absData } = await supabase
+      // C. Classement Absences (Version Robuste sans jointure forcée)
+      // 1. On récupère d'abord toutes les absences
+      const { data: absData, error: absError } = await supabase
         .from('absences')
-        .select(`nb_absences, nb_retards, profiles ( pseudo )`);
+        .select('nb_absences, nb_retards, user_id');
+
+      // 2. On récupère tous les profils pour faire la correspondance nous-mêmes
+      const { data: allProfiles } = await supabase
+        .from('profiles')
+        .select('id, pseudo');
 
       if (absData) {
-        const aggregation = absData.reduce((acc: any, curr: any) => {
-          const name = curr.profiles?.pseudo || "Anonyme";
-          if (!acc[name]) {
-            acc[name] = { username: name, abs: 0, ret: 0 };
-          }
-          acc[name].abs += curr.nb_absences;
-          acc[name].ret += curr.nb_retards;
+        // Création d'un dictionnaire pour retrouver le pseudo par ID rapidement
+        const profileMap = (allProfiles || []).reduce((acc: any, p: any) => {
+          acc[p.id] = p.pseudo;
           return acc;
         }, {});
+
+        const aggregation = absData.reduce((acc: any, curr: any) => {
+          // On cherche le pseudo dans notre map, sinon "Anonyme"
+          const pseudo = profileMap[curr.user_id] || "Anonyme";
+          
+          if (!acc[pseudo]) {
+            acc[pseudo] = { username: pseudo, abs: 0, ret: 0 };
+          }
+          
+          acc[pseudo].abs += (curr.nb_absences || 0);
+          acc[pseudo].ret += (curr.nb_retards || 0);
+          return acc;
+        }, {});
+
         setGlobalAbsences(Object.values(aggregation));
       }
 
