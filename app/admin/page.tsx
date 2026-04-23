@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+
 export default async function AdminPage() {
   const now = new Date().toISOString()
 

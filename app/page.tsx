@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [profil, setProfil] = useState<any>(null);
