@@ -15,42 +15,28 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        // 1. Inscription
-        const { data, error } = await supabase.auth.signUp({ 
+        // Inscription — le trigger handle_new_user crée automatiquement le profil
+        // avec pseudo (via metadata), golembucks=100, is_admin=false
+        const { error } = await supabase.auth.signUp({ 
           email, 
           password,
           options: {
-            data: { pseudo: pseudo } // Optionnel : stocke le pseudo dans metadata
+            data: { pseudo: pseudo }
           }
         })
         
         if (error) throw error
-
-        // 2. Création du profil dans la table 'profiles'
-        if (data.user) {
-          const { error: profileError } = await supabase.from('profiles').insert([
-            { 
-              id: data.user.id, 
-              pseudo: pseudo, 
-              golembucks: 1000,
-              is_admin: false 
-            }
-          ])
-          if (profileError) console.error("Erreur profil:", profileError.message)
-        }
         
+        // ✅ Plus d'INSERT manuel ici — le trigger s'en charge
         alert("Inscription réussie ! Vérifie tes emails (ou attends la validation).")
+
       } else {
-        // 3. Connexion
         const { error } = await supabase.auth.signInWithPassword({ 
           email, 
           password 
         })
         
         if (error) throw error
-
-        // IMPORTANT : On utilise window.location pour forcer le navigateur 
-        // à envoyer les nouveaux cookies au serveur sur la page d'accueil
         window.location.href = '/'
       }
     } catch (err: any) {
@@ -62,7 +48,7 @@ export default function LoginPage() {
 
   return (
     <main style={{ maxWidth: '400px', margin: '100px auto', padding: '20px', border: '2px solid black', fontFamily: 'monospace' }}>
-      <h1>{isSignUp ? 'REJOINDRE LE GOLEM' : 'CONNEXION'}</h1>
+      <h1>{isSignUp ? 'REJOINDRE ENSAE MARKET' : 'CONNEXION'}</h1>
       
       <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         {isSignUp && (
