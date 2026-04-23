@@ -7,7 +7,7 @@ export default function Home() {
   const [profil, setProfil] = useState<any>(null);
   const [paris, setParis] = useState<any[]>([]);
   const [parisTermines, setParisTermines] = useState<any[]>([]);
-  const [profileMap, setProfileMap] = useState<Record<string, string>>({});
+  const [profileMap, setProfileMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +27,6 @@ export default function Home() {
         if (p && p.is_validated) {
           const now = new Date().toISOString();
 
-          // Paris en cours
           const { data: enCours } = await supabase
             .from('paris')
             .select('*, mises(*)')
@@ -36,7 +35,6 @@ export default function Home() {
             .order('created_at', { ascending: false });
           setParis(enCours || []);
 
-          // Paris terminés (5 derniers)
           const { data: termines } = await supabase
             .from('paris')
             .select('*, mises(*)')
@@ -45,14 +43,13 @@ export default function Home() {
             .limit(5);
           setParisTermines(termines || []);
 
-          // Dictionnaire id -> pseudo pour les créateurs
           const { data: allProfiles } = await supabase
             .from('profiles')
-            .select('id, pseudo');
-          const map: Record<string, string> = (allProfiles || []).reduce((acc: any, pr: any) => {
-            acc[pr.id] = pr.pseudo;
-            return acc;
-          }, {});
+            .select('id, pseudo, avatar_url')
+          const map: Record<string, any> = (allProfiles || []).reduce((acc: any, pr: any) => {
+            acc[pr.id] = { pseudo: pr.pseudo, avatar_url: pr.avatar_url }
+            return acc
+          }, {})
           setProfileMap(map);
         }
       }
@@ -62,7 +59,7 @@ export default function Home() {
   }, []);
 
   const miser = async (pariId: string, issue: number) => {
-    const reponse = window.prompt("Combien de GolemBucks (GB) veux-tu miser ?");
+    const reponse = window.prompt("Combien de Golembucks (GB) veux-tu miser ?");
     const montant = parseInt(reponse || "0");
     if (!montant || montant <= 0 || isNaN(montant)) return alert("Montant invalide !");
     if (montant > profil.golembucks) return alert("Solde insuffisant !");
@@ -88,6 +85,20 @@ export default function Home() {
     };
   };
 
+  const AvatarPseudo = ({ id }: { id: string }) => {
+    const data = profileMap[id]
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+        <img
+          src={data?.avatar_url || '/avatars/golem.png'}
+          alt=""
+          style={{ width: '20px', height: '20px', objectFit: 'cover', borderRadius: '2px', border: '1px solid #ccc' }}
+        />
+        @{data?.pseudo ?? '?'}
+      </span>
+    )
+  }
+
   if (loading) return <p style={{ fontFamily: 'monospace', padding: '20px' }}>Chargement...</p>;
   if (!user) return <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'monospace' }}><a href="/login">[ CONNEXION REQUISE ]</a></div>;
 
@@ -110,17 +121,24 @@ export default function Home() {
   return (
     <main style={{ padding: '20px', fontFamily: 'monospace', maxWidth: '800px', margin: '0 auto' }}>
 
-      <nav style={{ display: 'flex', gap: '15px', marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '10px' }}>
-        <a href="/">[ ACCUEIL ]</a>
+      <nav style={{ display: 'flex', gap: '15px', marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '10px', alignItems: 'center' }}>
+        <span style={{ color: 'violet', fontFamily: 'Comic Sans', fontWeight: 'bold', fontSize: '1.1em', letterSpacing: '0.05em', marginRight: '5px', borderRight: '2px solid black', paddingRight: '15px', lineHeight: '1.2' }}>
+          ensaemarket
+        </span>
+        <a href="/profil">[ PROFIL ]</a>
         <a href="/creer">[ + PARI ]</a>
         <a href="/stats">[ STATS ]</a>
         {profil?.is_admin && <a href="/admin" style={{ color: 'red' }}>[ ADMIN ]</a>}
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img
+            src={profil?.avatar_url || '/avatars/golem.png'}
+            alt=""
+            style={{ width: '24px', height: '24px', objectFit: 'cover', borderRadius: '2px', border: '1px solid #ccc' }}
+          />
           <strong>@{profil?.pseudo}</strong> | {profil?.golembucks} GB
         </div>
       </nav>
 
-      {/* PARIS EN COURS */}
       <h2 style={{ textDecoration: 'underline' }}>PARIS EN COURS</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {paris.length > 0 ? paris.map((pari) => {
@@ -132,7 +150,7 @@ export default function Home() {
             <div key={pari.id} style={{ border: '2px solid black', padding: '15px', backgroundColor: 'white' }}>
               <h3 style={{ marginTop: 0, marginBottom: '4px' }}>{pari.titre}</h3>
               <p style={{ fontSize: '0.75em', color: '#666', margin: '0 0 4px' }}>
-                proposé par @{profileMap[pari.createur_id] ?? '?'}
+                proposé par <AvatarPseudo id={pari.createur_id} />
               </p>
               <p style={{ fontSize: '0.75em', color: '#666', margin: '0 0 8px' }}>
                 fin : {new Date(pari.echeance).toLocaleString('fr-FR')} — pot total : {totalGlobal} GB
@@ -160,7 +178,6 @@ export default function Home() {
         }) : <p>[ AUCUN PARI DISPONIBLE ]</p>}
       </div>
 
-      {/* HISTORIQUE (5 derniers paris terminés) */}
       {parisTermines.length > 0 && (
         <>
           <h2 style={{ textDecoration: 'underline', marginTop: '40px', color: '#666' }}>HISTORIQUE (5 derniers)</h2>
@@ -174,34 +191,17 @@ export default function Home() {
                 <div key={pari.id} style={{ border: '1px solid #aaa', padding: '15px', backgroundColor: '#f9f9f9', opacity: 0.85 }}>
                   <h3 style={{ marginTop: 0, marginBottom: '4px', color: '#444' }}>{pari.titre}</h3>
                   <p style={{ fontSize: '0.75em', color: '#888', margin: '0 0 8px' }}>
-                    proposé par @{profileMap[pari.createur_id] ?? '?'} — pot total : {totalGlobal} GB
+                    proposé par <AvatarPseudo id={pari.createur_id} /> — pot total : {totalGlobal} GB
                   </p>
                   <div style={{ display: 'flex', gap: '20px' }}>
-                    {/* Issue 1 */}
-                    <div style={{
-                      padding: '5px 12px',
-                      fontWeight: 'bold',
-                      border: '2px solid',
-                      borderColor: pari.gagnant === 1 ? '#2e7d32' : '#aaa',
-                      backgroundColor: pari.gagnant === 1 ? '#e8f5e9' : 'transparent',
-                      color: pari.gagnant === 1 ? '#2e7d32' : '#888',
-                    }}>
+                    <div style={{ padding: '5px 12px', fontWeight: 'bold', border: '2px solid', borderColor: pari.gagnant === 1 ? '#2e7d32' : '#aaa', backgroundColor: pari.gagnant === 1 ? '#e8f5e9' : 'transparent', color: pari.gagnant === 1 ? '#2e7d32' : '#888' }}>
                       {pari.issue_1} {pari.gagnant === 1 && '✓'}
                       <span style={{ fontSize: '0.75em', marginLeft: '6px' }}>{total1} GB</span>
                     </div>
-                    {/* Issue 2 */}
-                    <div style={{
-                      padding: '5px 12px',
-                      fontWeight: 'bold',
-                      border: '2px solid',
-                      borderColor: pari.gagnant === 2 ? '#2e7d32' : '#aaa',
-                      backgroundColor: pari.gagnant === 2 ? '#e8f5e9' : 'transparent',
-                      color: pari.gagnant === 2 ? '#2e7d32' : '#888',
-                    }}>
+                    <div style={{ padding: '5px 12px', fontWeight: 'bold', border: '2px solid', borderColor: pari.gagnant === 2 ? '#2e7d32' : '#aaa', backgroundColor: pari.gagnant === 2 ? '#e8f5e9' : 'transparent', color: pari.gagnant === 2 ? '#2e7d32' : '#888' }}>
                       {pari.issue_2} {pari.gagnant === 2 && '✓'}
                       <span style={{ fontSize: '0.75em', marginLeft: '6px' }}>{total2} GB</span>
                     </div>
-                    {/* Ma mise */}
                     {maMise && (
                       <div style={{ fontSize: '0.8em', color: '#666', alignSelf: 'center' }}>
                         ma mise : {maMise.montant} GB sur {maMise.issue_choisie === 1 ? pari.issue_1 : pari.issue_2}
