@@ -4,19 +4,20 @@ import { revalidatePath } from 'next/cache'
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
-export default async function AdminPage() {
-  const now = new Date().toISOString()
-
-  const adminClient = createClient(
+const makeClient = () => createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { 
+  {
     auth: { autoRefreshToken: false, persistSession: false },
     global: {
       fetch: (url, options = {}) => fetch(url, { ...options, cache: 'no-store' })
     }
   }
 )
+
+export default async function AdminPage() {
+  const now = new Date().toISOString()
+  const adminClient = makeClient()
 
   const { data: usersEnAttente } = await adminClient
     .from('profiles')
@@ -51,46 +52,26 @@ export default async function AdminPage() {
 
   async function validerUtilisateur(id: string) {
     'use server'
-    const c = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-    await c.from('profiles').update({ is_validated: true }).eq('id', id)
+    await makeClient().from('profiles').update({ is_validated: true }).eq('id', id)
     revalidatePath('/admin')
   }
 
   async function validerPari(id: string) {
     'use server'
-    const c = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-    await c.from('paris').update({ status: 'valide' }).eq('id', id)
+    await makeClient().from('paris').update({ status: 'valide' }).eq('id', id)
     revalidatePath('/admin')
     revalidatePath('/')
   }
 
   async function supprimerPari(id: string) {
     'use server'
-    const c = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-    await c.from('paris').delete().eq('id', id)
+    await makeClient().from('paris').delete().eq('id', id)
     revalidatePath('/admin')
   }
 
   async function resoudreGains(id: string, issue: number) {
     'use server'
-    const c = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-    const { error } = await c.rpc('distribuer_gains', {
+    const { error } = await makeClient().rpc('distribuer_gains', {
       pari_id_input: id,
       issue_gagnante: issue
     })
