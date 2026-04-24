@@ -129,6 +129,7 @@ export default function Home() {
         <a href="/profil">[ PROFIL ]</a>
         <a href="/creer">[ + PARI ]</a>
         <a href="/stats">[ STATS ]</a>
+        <a href="/casino" style={{ color: 'purple', fontWeight: 'bold' }}>[ CASINO ]</a>
         {profil?.is_admin && <a href="/admin" style={{ color: 'red' }}>[ ADMIN ]</a>}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img
