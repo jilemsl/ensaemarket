@@ -181,7 +181,7 @@ export default function Home() {
 
       {parisTermines.length > 0 && (
         <>
-          <h2 style={{ textDecoration: 'underline', marginTop: '40px', color: '#666' }}>HISTORIQUE (5 derniers)</h2>
+          <h2 style={{ textDecoration: 'underline', marginTop: '40px', color: '#666' }}>HISTORIQUE</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {parisTermines.map((pari) => {
               const misesDuPari = pari.mises || [];

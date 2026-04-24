@@ -84,7 +84,7 @@ export default function ProfilPage() {
           style={{ width: '80px', height: '80px', objectFit: 'cover', border: '2px solid black' }}
         />
         <div>
-          <h2 style={{ margin: '0 0 6px' }}>@{profil?.pseudo}</h2>
+          <h2 style={{ fontFamily: 'var(--font-monaco)', margin: '0 0 6px', width: 'fit-content' }}>@{profil?.pseudo}</h2>
           <p style={{ margin: '0 0 4px' }}>
             <strong>{profil?.golembucks} GB</strong>
           </p>
