@@ -130,6 +130,7 @@ export default function Home() {
         <a href="/creer">[ + PARI ]</a>
         <a href="/stats">[ STATS ]</a>
         <a href="/casino" style={{ color: 'purple', fontWeight: 'bold' }}>[ CASINO ]</a>
+        <a href="/marche" style={{ color: 'green', fontWeight: 'bold' }}>[ MARCHÉ ]</a>
         {profil?.is_admin && <a href="/admin" style={{ color: 'red' }}>[ ADMIN ]</a>}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img
