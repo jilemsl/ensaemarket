@@ -83,6 +83,24 @@ export default function ProfilPage() {
     setRenamingId(null)
   }
 
+  const relacher = async (mk: any) => {
+    const nom = mk.surnom ?? mk.nom
+    if (!window.confirm(`Relâcher ${nom} définitivement ? Cette action est irréversible.`)) return
+    if (profil?.featured_magikarp_id === mk.id) {
+      await supabase.from('profiles').update({ featured_magikarp_id: null }).eq('id', user.id)
+      setProfil((prev: any) => ({ ...prev, featured_magikarp_id: null }))
+    }
+    const { error } = await supabase.from('magikarps').delete().eq('id', mk.id)
+    if (error) { alert('Erreur : ' + error.message); return }
+    setMagikarps(prev => prev.filter(m => m.id !== mk.id))
+  }
+
+  const toggleFeatured = async (id: string) => {
+    const newId = profil?.featured_magikarp_id === id ? null : id
+    const { error } = await supabase.from('profiles').update({ featured_magikarp_id: newId }).eq('id', user.id)
+    if (!error) setProfil((prev: any) => ({ ...prev, featured_magikarp_id: newId }))
+  }
+
   if (loading) return <p style={{ fontFamily: 'monospace', padding: '20px' }}>Chargement...</p>
   if (!user)   return <div style={{ padding: '20px', fontFamily: 'monospace' }}><a href="/login">[ CONNEXION REQUISE ]</a></div>
 
@@ -91,6 +109,7 @@ export default function ProfilPage() {
       <a href="/" style={{ color: 'blue' }}>{'<- Retour'}</a>
 
       {/* INFOS PROFIL */}
+<<<<<<< HEAD
       <section style={{
         border: '2px solid black',
         padding: '20px',
@@ -137,6 +156,40 @@ export default function ProfilPage() {
           </p>
         </div>
       </section>
+=======
+      {(() => {
+        const featuredMk = profil?.featured_magikarp_id
+          ? magikarps.find(mk => mk.id === profil.featured_magikarp_id)
+          : null
+        const fSprite = featuredMk ? SPRITES[featuredMk.sprite_id ?? 9][featuredMk.is_shiny ? 'shiny' : 'normal'] : null
+        const fName   = featuredMk ? (featuredMk.surnom ?? featuredMk.nom) : null
+
+        return (
+          <section style={{ border: '2px solid black', padding: '20px', marginTop: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
+            <img src={profil?.avatar_url || '/avatars/golem.png'} alt="avatar" style={{ width: '80px', height: '80px', objectFit: 'cover', border: '2px solid black' }} />
+            <div style={{ flex: 1 }}>
+              <h2 style={{ margin: '0 0 6px' }}>@{profil?.pseudo}</h2>
+              <p style={{ margin: '0 0 4px' }}><strong>{profil?.golembucks} GB</strong></p>
+              <p style={{ margin: 0, fontSize: '0.8em', color: '#666' }}>
+                Statut : {profil?.is_validated ? '✓ validé' : '⏳ en attente'}
+                {profil?.is_admin && ' — ADMIN'}
+              </p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.8em', color: gainTotal >= 0 ? '#2e7d32' : '#c62828' }}>
+                Bilan paris terminés : {gainTotal >= 0 ? '+' : ''}{gainTotal} GB
+              </p>
+            </div>
+            {featuredMk && fSprite && (
+              <div style={{ textAlign: 'center', borderLeft: '1px solid #eee', paddingLeft: '20px', flexShrink: 0 }}>
+                <img src={fSprite} alt={fName!} style={{ width: '64px', imageRendering: 'pixelated', display: 'block', margin: '0 auto' }} />
+                <div style={{ fontSize: '0.72em', fontWeight: 'bold', color: featuredMk.is_shiny ? '#e65100' : '#c0392b', marginTop: '4px', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {featuredMk.is_shiny ? '✨ ' : '⭐ '}{fName}
+                </div>
+              </div>
+            )}
+          </section>
+        )
+      })()}
+>>>>>>> ce32860 (masterclass de claude et magikarp)
 
       {/* AVATAR */}
       <section style={{ marginTop: '30px' }}>
@@ -146,19 +199,18 @@ export default function ProfilPage() {
         </a>
       </section>
 
-      {/* BOÎTE À MAGIKARPES */}
+      {/* ÉQUIPE MAGIKARPE */}
       <section style={{ marginTop: '30px' }}>
         <h3 style={{ borderBottom: '1px solid #ccc', paddingBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          BOÎTE À MAGIKARPES
-          <span style={{ fontSize: '0.8em', fontWeight: 'normal', color: magikarps.length >= 30 ? 'red' : '#666' }}>
-            {magikarps.length} / 30
+          ÉQUIPE MAGIKARPE
+          <span style={{ fontSize: '0.8em', fontWeight: 'normal', color: magikarps.filter((m: any) => !m.en_vente).length >= 6 ? 'red' : '#666' }}>
+            {magikarps.filter((m: any) => !m.en_vente).length} / 6
           </span>
         </h3>
 
         {magikarps.length === 0 ? (
           <p style={{ color: '#666' }}>
-            Aucun Magikarpe pour l'instant.{' '}
-            <a href="/casino" style={{ color: 'purple' }}>Aller pêcher au Lac de l'X →</a>
+            Équipe vide. <a href="/casino" style={{ color: 'purple' }}>Aller pêcher au Lac de l'X →</a>
           </p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px', marginTop: '12px' }}>
@@ -197,9 +249,22 @@ export default function ProfilPage() {
                             title="Renommer"
                             style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85em', padding: '0 2px', color: '#888', flexShrink: 0 }}
                           >✏️</button>
+                          <button
+                            onClick={() => toggleFeatured(mk.id)}
+                            title={profil?.featured_magikarp_id === mk.id ? 'Retirer de la vitrine' : 'Mettre en vitrine'}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85em', padding: '0 2px', flexShrink: 0, opacity: profil?.featured_magikarp_id === mk.id ? 1 : 0.35 }}
+                          >⭐</button>
+                          {!mk.en_vente && (
+                            <button
+                              onClick={() => relacher(mk)}
+                              title="Relâcher"
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85em', padding: '0 2px', color: '#c62828', flexShrink: 0 }}
+                            >🌊</button>
+                          )}
                         </div>
                       )}
                       {mk.is_shiny && <span style={{ fontSize: '0.75em', backgroundColor: '#f9a825', color: '#000', padding: '0 4px' }}>CHROMATIQUE</span>}
+            {mk.en_vente && <span style={{ fontSize: '0.75em', backgroundColor: '#2e7d32', color: '#fff', padding: '0 4px', marginLeft: '2px' }}>EN VENTE</span>}
                       <div style={{ color: '#666', marginTop: '2px' }}>{mk.nature} ({effet})</div>
                     </div>
                   </div>

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const COUT_PECHE = 50;
-const TAILLE_BOITE = 30;
+const TAILLE_BOITE = 6;
 const sleep = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
 
 const SPRITES = [
@@ -104,6 +104,7 @@ export default function CasinoPage() {
   const [peche, setPeche]         = useState<PecheState>('idle');
   const [magikarp, setMagikarp]   = useState<any>(null);
   const [magikarpNom, setMagikarpNom] = useState('');
+  const [magikarpId, setMagikarpId]   = useState<string | null>(null);
   const [dialogText, setDialogText]   = useState('Appuyez sur le bouton pour lancer la canne...');
   const [peching, setPeching]     = useState(false);
   const [dotCount, setDotCount]   = useState(1);
@@ -116,7 +117,7 @@ export default function CasinoPage() {
         setUser(cu);
         const { data: p } = await supabase.from('profiles').select('*').eq('id', cu.id).single();
         setProfil(p);
-        const { count } = await supabase.from('magikarps').select('id', { count: 'exact', head: true }).eq('user_id', cu.id);
+        const { count } = await supabase.from('magikarps').select('id', { count: 'exact', head: true }).eq('user_id', cu.id).eq('en_vente', false);
         setNbMagikarps(count || 0);
       }
       setLoading(false);
@@ -145,7 +146,7 @@ export default function CasinoPage() {
 
   const lancerLigne = async () => {
     if (peching) return;
-    if (nbMagikarps >= TAILLE_BOITE) { alert('Ta boîte est pleine (30/30) ! Gère-la dans ton profil.'); return; }
+    if (nbMagikarps >= TAILLE_BOITE) { alert("Ton équipe est pleine (6/6) ! Libère une place dans ton profil."); return; }
     if (!profil || profil.golembucks < COUT_PECHE) { alert(`Solde insuffisant ! Il faut ${COUT_PECHE} GB.`); return; }
 
     setPeching(true);
@@ -180,17 +181,20 @@ export default function CasinoPage() {
     const mk = randomMagikarp();
     const nom = await generateUniqueName();
 
-    const { error } = await supabase.from('magikarps').insert([{
+    const { data: inserted, error } = await supabase.from('magikarps').insert([{
       user_id: user.id, nom,
       nature: mk.nature, poids: mk.poids, taille: mk.taille,
       iv_pv: mk.iv_pv, iv_atq: mk.iv_atq, iv_def: mk.iv_def,
       iv_atq_spe: mk.iv_atq_spe, iv_def_spe: mk.iv_def_spe, iv_vit: mk.iv_vit,
       is_shiny: mk.is_shiny, sprite_id: mk.sprite_id,
-    }]);
+    }]).select('id').single();
 
     if (error) {
-      typeText('Erreur lors de la capture...');
-      await sleep(2000);
+      // Refund GB
+      await supabase.from('profiles').update({ golembucks: profil.golembucks }).eq('id', user.id);
+      setProfil((prev: any) => ({ ...prev, golembucks: prev.golembucks + COUT_PECHE }));
+      typeText(`Erreur : ${error.message.slice(0, 60)}`);
+      await sleep(3500);
       setPeche('idle');
       typeText('Appuyez sur le bouton pour lancer la canne...');
       setPeching(false);
@@ -200,12 +204,23 @@ export default function CasinoPage() {
     setNbMagikarps(p => p + 1);
     setMagikarp(mk);
     setMagikarpNom(nom);
+    setMagikarpId(inserted?.id ?? null);
     setPeche('caught');
     typeText(mk.is_shiny ? '✨ Un Magikarpe chromatique est apparu !' : 'Un Magikarpe sauvage est apparu !');
     setPeching(false);
   };
 
   const ivColor = (v: number) => v === 31 ? '#2e7d32' : v === 0 ? '#c62828' : '#444';
+
+  const relacherCapture = async () => {
+    if (!magikarpId) return;
+    if (!window.confirm(`Relâcher ${magikarpNom} définitivement ? Cette action est irréversible.`)) return;
+    await supabase.from('magikarps').delete().eq('id', magikarpId);
+    setNbMagikarps(p => p - 1);
+    setMagikarpId(null);
+    setPeche('idle');
+    typeText('Appuyez sur le bouton pour lancer la canne...');
+  };
 
   const btnDisabled = peching || !profil || profil.golembucks < COUT_PECHE || nbMagikarps >= TAILLE_BOITE;
 
@@ -221,10 +236,20 @@ export default function CasinoPage() {
   return (
     <main style={{ padding: '20px', fontFamily: 'monospace', maxWidth: '800px', margin: '0 auto' }}>
       <style>{`
-        @keyframes waterFlow  { from { background-position: 0 0; } to { background-position: 64px 0; } }
-        @keyframes bob        { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-        @keyframes nibblePop  { 0%,100% { transform: scale(1); } 50% { transform: scale(1.4); } }
-        @keyframes cursor     { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes waterTile {
+          0%   { background-position: 0px 0px; }
+          25%  { background-position: 8px 0px; }
+          50%  { background-position: 16px 4px; }
+          75%  { background-position: 8px 4px; }
+        }
+        @keyframes rodCast {
+          from { clip-path: inset(0 100% 0 0); }
+          to   { clip-path: inset(0 0% 0 0); }
+        }
+        @keyframes bob      { 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-5px);} }
+        @keyframes nibblePop{ 0%,100%{ transform:scale(1) translateY(0);} 50%{ transform:scale(1.35) translateY(-4px);} }
+        @keyframes cursor   { 0%,100%{ opacity:1;} 50%{ opacity:0;} }
+        @keyframes lineGrow { from{ height:0;} to{ height:56px;} }
       `}</style>
 
       <nav style={{ display: 'flex', gap: '15px', marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '10px', alignItems: 'center' }}>
@@ -235,6 +260,7 @@ export default function CasinoPage() {
         <a href="/creer">[ + PARI ]</a>
         <a href="/stats">[ STATS ]</a>
         <a href="/casino" style={{ color: 'purple', fontWeight: 'bold' }}>[ CASINO ]</a>
+        <a href="/marche" style={{ color: 'green', fontWeight: 'bold' }}>[ MARCHÉ ]</a>
         {profil?.is_admin && <a href="/admin" style={{ color: 'red' }}>[ ADMIN ]</a>}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src={profil?.avatar_url || '/avatars/golem.png'} alt="" style={{ width: '24px', height: '24px', objectFit: 'cover', borderRadius: '2px', border: '1px solid #ccc' }} />
@@ -252,95 +278,135 @@ export default function CasinoPage() {
 
       <div style={{ border: '2px solid black', padding: '20px', backgroundColor: 'white', minHeight: '400px' }}>
         <p style={{ color: '#555', fontSize: '0.85em', margin: '0 0 14px' }}>
-          Coût : <strong>{COUT_PECHE} GB</strong> par lancer &nbsp;—&nbsp; Boîte : <strong>{nbMagikarps}/30</strong>
-          {nbMagikarps >= TAILLE_BOITE && <span style={{ color: 'red', marginLeft: '10px' }}>[ BOÎTE PLEINE ]</span>}
+          Coût : <strong>{COUT_PECHE} GB</strong> par lancer &nbsp;—&nbsp; Équipe : <strong>{nbMagikarps}/6</strong>
+          {nbMagikarps >= TAILLE_BOITE && <span style={{ color: 'red', marginLeft: '10px' }}>[ ÉQUIPE PLEINE ]</span>}
         </p>
 
-        {/* ── Lake scene ── */}
-        <div style={{ position: 'relative', height: '230px', border: '3px solid #1a237e', overflow: 'hidden' }}>
+        {/* ── Lake scene — Pokemon HGSS side view ── */}
+        <div style={{ position: 'relative', height: '240px', border: '3px solid #1a3060', overflow: 'hidden' }}>
 
-          {/* Animated water background */}
+          {/* Water — tuiles diamant style HGSS */}
           <div style={{
-            position: 'absolute', inset: 0,
-            backgroundColor: '#3d6ec7',
-            backgroundImage: [
-              'repeating-linear-gradient(90deg, transparent 0, transparent 30px, rgba(100,160,255,0.25) 30px, rgba(100,160,255,0.25) 32px)',
-              'repeating-linear-gradient(transparent 0, transparent 14px, rgba(100,160,255,0.15) 14px, rgba(100,160,255,0.15) 16px)',
-            ].join(','),
-            animation: 'waterFlow 3s linear infinite',
+            position: 'absolute', top: 0, left: 0, bottom: 0, right: '36%',
+            backgroundColor: '#2840b0',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Crect width='32' height='32' fill='%232840b0'/%3E%3Cellipse cx='8' cy='16' rx='6.5' ry='11' fill='%233858cc'/%3E%3Cellipse cx='24' cy='0' rx='6.5' ry='11' fill='%233858cc'/%3E%3Cellipse cx='24' cy='32' rx='6.5' ry='11' fill='%233858cc'/%3E%3Cellipse cx='6' cy='11' rx='3' ry='4' fill='%235878e8' opacity='0.65'/%3E%3Cellipse cx='22' cy='27' rx='3' ry='4' fill='%235878e8' opacity='0.65'/%3E%3Cellipse cx='5.5' cy='9' rx='1.8' ry='2.2' fill='%23ffffff' opacity='0.18'/%3E%3C/svg%3E")`,
+            backgroundSize: '32px 32px',
+            animation: 'waterTile 1.2s steps(4) infinite',
           }} />
 
-          {/* Grass bank at top */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40px', backgroundColor: '#43a047', borderBottom: '4px solid #2e7d32', zIndex: 2 }} />
-
-          {/* Fisherman trainer sprite */}
-          <div style={{ position: 'absolute', top: '-2px', left: '50%', transform: 'translateX(-50%)', zIndex: 3, textAlign: 'center' }}>
-            <img
-              src="https://play.pokemonshowdown.com/sprites/trainers/fisherman.png"
-              alt="Pêcheur"
-              style={{ width: '64px', imageRendering: 'pixelated', display: 'block' }}
-            />
+          {/* Terrain / falaise — côté droit */}
+          <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '36%', backgroundColor: '#b8885a', zIndex: 2 }}>
+            {/* Texture rocheuse */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: [
+                'radial-gradient(ellipse 18px 10px at 30% 25%, rgba(0,0,0,0.12) 0%, transparent 100%)',
+                'radial-gradient(ellipse 14px 8px at 65% 55%, rgba(0,0,0,0.08) 0%, transparent 100%)',
+                'radial-gradient(ellipse 10px 6px at 20% 75%, rgba(0,0,0,0.07) 0%, transparent 100%)',
+                'radial-gradient(ellipse 20px 5px at 50% 40%, rgba(255,255,255,0.06) 0%, transparent 100%)',
+              ].join(','),
+            }} />
+            {/* Ombre sur le bord gauche du terrain */}
+            <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '8px', background: 'linear-gradient(to right, rgba(0,0,0,0.35), transparent)' }} />
           </div>
 
-          {/* Fishing line */}
+          {/* Bord de falaise (entre eau et terre) */}
+          <div style={{ position: 'absolute', top: 0, right: '36%', bottom: 0, width: '6px', backgroundColor: '#7a5830', zIndex: 3 }} />
+
+          {/* Canne à pêche — s'étend horizontalement vers l'eau */}
           {showLine && (
             <div style={{
-              position: 'absolute', top: '78px', left: '50%',
-              width: '1px', height: '62px',
-              backgroundColor: 'rgba(255,255,255,0.8)',
-              zIndex: 3,
+              position: 'absolute',
+              top: '72px',
+              right: 'calc(36% + 6px)',
+              width: '115px',
+              height: '3px',
+              backgroundColor: '#3a2010',
+              transformOrigin: 'right center',
+              animation: peche === 'casting' ? 'rodCast 0.55s ease-out forwards' : 'none',
+              zIndex: 4,
             }} />
           )}
 
-          {/* Float bob */}
+          {/* Ligne de pêche — tombe du bout de la canne */}
+          {showLine && (
+            <div style={{
+              position: 'absolute',
+              top: '75px',
+              right: 'calc(36% + 6px + 115px)',
+              width: '1px',
+              height: '56px',
+              background: 'linear-gradient(to bottom, rgba(220,220,220,0.9), rgba(220,220,220,0.4))',
+              transformOrigin: 'top',
+              animation: peche === 'casting' ? 'lineGrow 0.4s 0.45s ease-out both' : 'none',
+              zIndex: 4,
+            }} />
+          )}
+
+          {/* Flotteur */}
           {showFloat && (
             <div style={{
-              position: 'absolute', top: '138px', left: 'calc(50% - 5px)',
-              width: '10px', height: '10px',
+              position: 'absolute',
+              top: '126px',
+              right: 'calc(36% + 6px + 109px)',
+              width: '12px', height: '12px',
               borderRadius: '50%',
-              backgroundColor: '#ff1744',
+              background: 'radial-gradient(circle at 35% 30%, #ff6b6b, #c62828)',
               border: '2px solid white',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
               animation: 'bob 1.1s ease-in-out infinite',
-              zIndex: 3,
+              zIndex: 4,
             }} />
           )}
 
-          {/* Nibble splash */}
+          {/* Morsure — flotteur plonge */}
           {showNibble && (
             <div style={{
-              position: 'absolute', top: '133px', left: 'calc(50% - 9px)',
+              position: 'absolute',
+              top: '120px',
+              right: 'calc(36% + 6px + 103px)',
               width: '18px', height: '18px',
               borderRadius: '50%',
-              backgroundColor: '#ff1744',
+              background: 'radial-gradient(circle at 35% 30%, #ff6b6b, #c62828)',
               border: '3px solid white',
-              animation: 'nibblePop 0.25s ease-in-out infinite',
-              zIndex: 3,
+              boxShadow: '0 0 10px rgba(255,100,100,0.9)',
+              animation: 'nibblePop 0.22s ease-in-out infinite',
+              zIndex: 4,
             }} />
           )}
 
-          {/* Caught Magikarp sprite */}
+          {/* Magikarpe capturé — remonte de l'eau */}
           {peche === 'caught' && spriteUrl && (
-            <div style={{ position: 'absolute', bottom: '58px', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', zIndex: 3 }}>
-              <img src={spriteUrl} alt="Magikarp" style={{ width: '80px', imageRendering: 'pixelated' }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '60px',
+              right: 'calc(36% + 6px + 60px)',
+              zIndex: 4,
+              textAlign: 'center',
+            }}>
+              <img src={spriteUrl} alt="Magikarp" style={{ width: '88px', imageRendering: 'pixelated', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }} />
             </div>
           )}
 
-          {/* Pokémon-style dialog box */}
+          {/* Boîte de dialogue — style Pokemon HGSS */}
           <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '56px',
-            backgroundColor: 'white',
-            borderTop: '4px solid #1a237e',
-            padding: '10px 16px',
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '60px',
+            backgroundColor: '#f8f4e8',
+            borderTop: '5px solid #a87830',
+            borderBottom: 'none',
+            padding: '10px 18px',
             fontFamily: 'monospace',
-            fontSize: '0.9em',
+            fontSize: '0.92em',
             display: 'flex', alignItems: 'center',
-            zIndex: 4,
-            boxShadow: 'inset 0 2px 0 rgba(0,0,0,0.08)',
+            zIndex: 5,
+            boxShadow: 'inset 0 3px 0 #c8a040',
           }}>
-            {peche === 'waiting'
-              ? <span style={{ letterSpacing: '4px', fontSize: '1.1em' }}>{'▪'.repeat(dotCount)}</span>
-              : <span>{dialogText}<span style={{ animation: 'cursor 0.8s step-start infinite', display: 'inline-block', marginLeft: '1px' }}>▋</span></span>
-            }
+            <div style={{ borderLeft: '3px solid #a87830', paddingLeft: '10px', width: '100%' }}>
+              {peche === 'waiting'
+                ? <span style={{ letterSpacing: '5px', fontSize: '1.05em', color: '#333' }}>{'▪'.repeat(dotCount)}</span>
+                : <span style={{ color: '#1a1a1a' }}>{dialogText}<span style={{ animation: 'cursor 0.8s step-start infinite', display: 'inline-block', marginLeft: '1px' }}>▋</span></span>
+              }
+            </div>
           </div>
         </div>
 
@@ -383,6 +449,12 @@ export default function CasinoPage() {
                 <div style={{ fontSize: '0.8em', color: '#666' }}>
                   {magikarp.poids} kg &nbsp;—&nbsp; {magikarp.taille} m
                 </div>
+                <button
+                  onClick={relacherCapture}
+                  style={{ marginTop: '8px', fontFamily: 'monospace', fontSize: '0.8em', padding: '3px 10px', border: '1px solid #c62828', color: '#c62828', background: 'none', cursor: 'pointer' }}
+                >
+                  [ RELÂCHER ]
+                </button>
               </div>
             </div>
             <div style={{ fontSize: '0.82em' }}>
